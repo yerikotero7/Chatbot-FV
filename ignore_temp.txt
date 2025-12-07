@@ -1,0 +1,6 @@
+# Archivos de configuración de Python
+__pycache__/
+
+# Archivos sensibles (¡IMPORTANTE!)
+.env
+api_key.txt
