@@ -24,7 +24,8 @@ Si te preguntan algo fuera de la energía solar fotovoltaica, responde que tu es
 # --- CONEXIÓN Y VALIDACIÓN DE LA CLAVE API DE GEMINI ---
 def setup_gemini():
     """Configura la API de Gemini, valida la clave y maneja errores."""
-    MODEL_NAME = 'gemini-pro' # Modelo universal y estable (soluciona error 404)
+    # CAMBIO CRÍTICO: Usamos el modelo estable actual, gemini-2.5-flash
+    MODEL_NAME = 'gemini-2.5-flash' 
 
     try:
         # Intenta obtener la clave API de Streamlit Secrets
@@ -61,11 +62,11 @@ def setup_gemini():
 if 'gemini_model' not in st.session_state:
     st.session_state.gemini_model = setup_gemini()
     st.session_state.chat = st.session_state.gemini_model.start_chat(history=[])
-    st.session_state.messages = [] # <--- Corrección de sintaxis y lógica
+    st.session_state.messages = [] 
 
 # --- Inicialización del Historial de Mensajes ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [] # <--- Esta es la línea que antes causó el SyntaxError (corregida)
+    st.session_state.messages = [] 
 
 # --- Ejemplos de Preguntas ---
 st.sidebar.header("Ejemplos de Preguntas")
