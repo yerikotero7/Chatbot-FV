@@ -1,14 +1,13 @@
 import streamlit as st
 import google.generativeai as genai
 from google.generativeai.types import GenerationConfig
-import os
 
 # --- Configuración de la Página ---
 st.set_page_config(page_title="Asistente FV", page_icon="⚡", layout="centered")
 st.title("⚡ Asistente Técnico Fotovoltaico (FV)")
 st.caption("Soy tu IA especializada en diseño, componentes y normativas de instalaciones de placas solares.")
 
-# 1. ESTABLECER ROL/PROMPT FIJO
+# 1. ESTABLECER ROL/PROMPT FIJO (Ahora lo pasamos al cliente)
 SISTEM_PROMPT = """
 Tu rol es ser un Asistente Técnico Especializado en Instalaciones Fotovoltaicas. 
 Debes responder con precisión, basándote en conocimientos técnicos de:
@@ -17,6 +16,8 @@ Debes responder con precisión, basándote en conocimientos técnicos de:
 - Cálculos de rendimiento y dimensionamiento.
 - Normativas (ej. CTE, REBT, R.D. 244/2019 en España, o equivalentes).
 Tu tono debe ser profesional, claro, didáctico y útil. 
+Siempre que sea posible, ofrece la respuesta sencilla, pero con la explicación técnica detrás.
+Si te preguntan algo fuera de la energía solar fotovoltaica, responde que tu especialidad es únicamente FV.
 """
 
 # --- CONEXIÓN Y MODELO ESTABLE ---
@@ -27,17 +28,17 @@ try:
     # 2. Configurar el cliente Gemini
     genai.configure(api_key=API_KEY)
 
-    # 3. Configuración de generación
+    # 3. Configuración de generación (Quitamos system_instruction de aquí)
     config = GenerationConfig(
-        system_instruction=SISTEM_PROMPT,
         temperature=0.4,
     )
 
-    # 4. Inicializar el modelo estable y el chat (CORRECCIÓN DE MODELO)
+    # 4. Inicializar el modelo, pasamos system_instruction directamente al cliente (SOLUCIÓN AL TypeError)
     MODEL_NAME = 'gemini-2.5-flash'
     client = genai.GenerativeModel(
         model_name=MODEL_NAME, 
-        generation_config=config
+        generation_config=config,
+        system_instruction=SISTEM_PROMPT # <--- EL CAMBIO CLAVE
     )
     
     # Inicializar el chat si no existe
@@ -45,7 +46,6 @@ try:
         st.session_state.chat = client.start_chat(history=[])
 
 except Exception as e:
-    # Si hay algún error (clave inválida, modelo no encontrado, etc.)
     st.error(f"Error al inicializar el chatbot. Por favor, asegúrate de que tu clave GEMINI_API_KEY sea válida y esté en Streamlit Secrets. Detalles: {e}")
     st.stop()
     
