@@ -1,9 +1,10 @@
 import streamlit as st
-from google import genai
-from google.genai.types import GenerationConfig
+import google.generativeai as genai # Cambiado de 'from google import genai' para mayor claridad
+from google.generativeai.types import GenerationConfig
+import os # Para futuras mejoras o lectura de variables de entorno
 
 # --- Configuración de la Página ---
-st.set_page_config(page_title="Asistente FV", page_icon="⚡")
+st.set_page_config(page_title="Asistente FV", page_icon="⚡", layout="centered")
 
 st.title("⚡ Asistente Técnico Fotovoltaico (FV)")
 st.caption("Soy tu IA especializada en diseño, componentes y normativas de instalaciones de placas solares.")
@@ -21,22 +22,48 @@ Siempre que sea posible, ofrece la respuesta sencilla, pero con la explicación 
 Si te preguntan algo fuera de la energía solar fotovoltaica, responde que tu especialidad es únicamente FV.
 """
 
-# --- Conexión con Gemini (Se lee la clave API de secrets.toml localmente o de los secretos de Streamlit Cloud) ---
-try:
-    # Intenta leer la clave API de los secretos de Streamlit (o del archivo secrets.toml local)
-    API_KEY = st.secrets["GEMINI_API_KEY"]
-except KeyError:
-    st.error("Error: La clave GEMINI_API_KEY no se encontró.")
-    st.stop()
+# --- CONEXIÓN Y VALIDACIÓN DE LA CLAVE API DE GEMINI (CRÍTICO) ---
+def setup_gemini():
+    """Configura la API de Gemini y valida la clave."""
+    try:
+        # Intenta obtener la clave API de Streamlit Secrets (online)
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except KeyError:
+        st.error("Error de configuración: La clave 'GEMINI_API_KEY' no se encontró en los secretos de Streamlit Cloud.")
+        st.info("Asegúrate de haber configurado tu clave API en 'Manage app -> Settings -> Secrets'.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Error inesperado al leer los secretos de Streamlit: {e}")
+        st.stop()
 
-# Inicializar el cliente de Gemini
-client = genai.Client(api_key=API_KEY)
+    if not api_key:
+        st.error("Error de configuración: La clave 'GEMINI_API_KEY' está vacía. Por favor, revísala en los secretos de Streamlit Cloud.")
+        st.stop()
 
-# Configuración de generación para asegurar la respuesta de la IA
-config = GenerationConfig(
-    system_instruction=SISTEM_PROMPT,
-    temperature=0.4, # Un valor bajo para respuestas más precisas y menos creativas
-)
+    try:
+        genai.configure(api_key=api_key)
+        # Intentar una llamada de prueba para validar la clave de inmediato
+        # Esto puede fallar si la clave es inválida.
+        genai.get_model('gemini-1.5-flash-latest') # Usamos un modelo que sabemos que existe
+    except Exception as e:
+        st.error(f"Error al conectar con Google Gemini. La clave API puede ser inválida o ha expirado. Detalles: {e}")
+        st.info("Por favor, genera una nueva clave API en https://ai.google.dev/gemini-api/docs/api-key y actualiza tus secretos en Streamlit Cloud.")
+        st.stop()
+    
+    return genai.GenerativeModel(
+        model_name='gemini-1.5-flash-latest', # Modelo rápido y eficiente para chat
+        generation_config=GenerationConfig(
+            system_instruction=SISTEM_PROMPT,
+            temperature=0.4, # Un valor bajo para respuestas más precisas y menos creativas
+            top_p=0.9,
+            top_k=40,
+        )
+    )
+
+# Inicializar el modelo de Gemini solo una vez
+if 'gemini_model' not in st.session_state:
+    st.session_state.gemini_model = setup_gemini()
+    st.session_state.chat = st.session_state.gemini_model.start_chat(history=[])
 
 # Inicializar el historial de chat si no existe
 if "messages" not in st.session_state:
@@ -67,23 +94,13 @@ if prompt := st.chat_input("Escribe tu consulta aquí..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # 2. Preparar el historial para enviarlo a la API
-    # La API de Gemini necesita el historial en un formato específico (roles: user/model)
-    history_for_api = [
-        genai.types.Content(role=m["role"], parts=[genai.types.Part.from_text(m["content"])]) 
-        for m in st.session_state.messages
-    ]
-
-    # 3. Llamada a la API de Gemini
+    # 2. Llamada a la API de Gemini
     try:
         with st.spinner("El Asistente FV está pensando..."):
-            response = client.models.generate_content(
-                model='gemini-2.5-flash', # Modelo rápido y eficiente para chat
-                contents=history_for_api,
-                config=config,
-            )
+            # Enviar el prompt al historial de chat de Gemini
+            response = st.session_state.chat.send_message(prompt)
         
-        # 4. Agregar la respuesta del modelo al historial y mostrarla
+        # 3. Agregar la respuesta del modelo al historial y mostrarla
         response_text = response.text
         st.session_state.messages.append({"role": "assistant", "content": response_text})
         
@@ -91,4 +108,5 @@ if prompt := st.chat_input("Escribe tu consulta aquí..."):
             st.markdown(response_text)
 
     except Exception as e:
-        st.error(f"Ocurrió un error al comunicarse con la IA: {e}")
+        st.error(f"Ocurrió un error al comunicarse con la IA: {e}. Intenta reiniciar la aplicación o verificar tu clave API.")
+        st.exception(e) # Muestra el error completo para depuración
