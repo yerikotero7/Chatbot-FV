@@ -44,7 +44,7 @@ def setup_gemini():
         genai.get_model(MODEL_NAME) 
     except Exception as e:
         # Esto capturará errores de clave inválida o de conexión
-        st.error(f"Error al conectar con Google Gemini. La clave API puede ser inválida, o el modelo no está disponible. Detalles: {e}")
+        st.error(f"Error al conectar con Google Gemini. La clave API puede ser inválida o el modelo no está disponible. Detalles: {e}")
         st.info("Por favor, genera una **clave API nueva** y actualiza tus secretos en Streamlit Cloud.")
         st.stop()
     
@@ -61,7 +61,11 @@ def setup_gemini():
 if 'gemini_model' not in st.session_state:
     st.session_state.gemini_model = setup_gemini()
     st.session_state.chat = st.session_state.gemini_model.start_chat(history=[])
-    st.session_state.messages = [] # Inicialización correcta del historial (soluciona SyntaxError)
+    st.session_state.messages = [] # <--- Corrección de sintaxis y lógica
+
+# --- Inicialización del Historial de Mensajes ---
+if "messages" not in st.session_state:
+    st.session_state.messages = [] # <--- Esta es la línea que antes causó el SyntaxError (corregida)
 
 # --- Ejemplos de Preguntas ---
 st.sidebar.header("Ejemplos de Preguntas")
